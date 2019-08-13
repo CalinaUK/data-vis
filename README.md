@@ -12,4 +12,4 @@ lib/views includes the different layouts
 
 Note: This version only works in older versions of Firefox due to cross origin erorrs. 
 
-
+![alt text](http://puu.sh/E4HUb/21077dffc2.png)
