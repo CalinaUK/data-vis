@@ -1,0 +1,82 @@
+/*CSS file for d3 trees*/
+
+
+
+
+#uSelectID {
+	color: black;
+}
+
+/* Group styling*/
+
+.cssClassNode :hover
+{
+	font: 14px sans-serif;
+}
+
+/* Link styling*/
+.cssClassLink {
+	fill: none;
+	stroke: steelblue;
+	stroke-width: 1.5px;
+	pointer-events: none;
+}
+
+/* Circle styling*/
+.cssClassNode circle {
+	opacity: 0.7;
+	stroke: black;
+	fill: Magenta;
+	stroke-width: 1.5px;
+}
+.leafNode circle {
+	fill:  white;
+}
+.rootNode circle {
+	fill:   #a6acaf;
+}
+
+.intermediateNodeA circle {
+	fill: red;
+}
+
+.intermediateNodeB circle {
+	fill: green;
+}
+
+.intermediateNodeC circle {
+	fill: aqua;
+}
+.intermediateNodeD circle {
+	fill: orange;
+}
+.cssClassNode.highlight  circle {
+	stroke: black;
+	fill: black;
+	stroke-width: 1.5px;
+}
+
+
+/* Text styling*/
+.cssClassNode text {
+	fill: Black;
+	font: 10px sans-serif;
+}
+.cssClassNode.rootNode text{
+	text-anchor: start;
+    transform: translate(-15px, 0px);
+		fill: Black;
+}
+.cssClassNode.intermediateNode text{
+	text-anchor: middle;
+    transform: translate(-15px, 0px);
+}
+.cssClassNode.leafNode text{
+	text-anchor: start;
+    transform: translate(-15px, 0px);
+		font: 8px sans-serif;
+}
+.cssClassNode.highlight text {
+	fill: black;
+	font: 12px sans-serif;
+}

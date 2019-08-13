@@ -1,0 +1,13 @@
+/*CSS file for pie charts*/
+
+		path {
+			opacity: 0.8;
+			
+		}
+		
+		path:hover {
+			opacity: 1.0;
+			stroke-width: 2px;
+			stroke: black;
+			
+		}

@@ -1,0 +1,116 @@
+
+
+/*==============================================
+ *
+ * CSS Stylesheet for overall styling
+ *
+ * 19/11/2018	dc	Created
+ *===============================================*/
+
+
+ html, body {
+	height: 100%;
+	width: 100%;
+	font-family: 'News Cycle', sans-serif;
+	font-size: 14pt;
+  color: black;
+}
+
+.main {
+    display: flex;
+    flex-direction:  row;
+}
+
+.main div {
+
+    flex: 1;
+}
+
+#packTitle {
+  color: black;
+  font-size: 30pt;
+
+  padding-bottom: 20px;
+}
+#pieTitle {
+  color: black;
+  font-size: 25pt;
+
+  padding-bottom: 20px;
+}
+#mapTitle {
+  color: black;
+  font-size: 30pt;
+
+  padding-bottom: 20px;
+}
+#uniSelect {
+  color: black;
+  font-size: 30pt;
+  text-align: left;
+
+  padding-bottom: 20px;
+}
+
+#BubbleTitle {
+  color: black;
+  font-size: 30pt;
+
+  padding-bottom: 20px;
+}
+
+#ZeroStarTitle {
+  color: black;
+  font-size: 20pt;
+
+
+  padding-bottom: 20px;
+}
+
+body {
+    background-color: 	 	#fbf7f5;
+}
+
+.mapPanel {
+    width: 30%;
+    float: left;
+    padding: 15px;
+}
+.mainPanel {
+    width: 67%;
+    float: left;
+    padding: 15px;
+}
+
+div.tooltip {
+    position: absolute;
+    text-align: center;
+    width: 60px;
+    height: 28px;
+    padding: 2px;
+    font: 12px sans-serif;
+    background: lightsteelblue;
+    border: 0px;
+    border-radius: 8px;
+    pointer-events: none;
+}
+
+.focus circle {
+  fill: none;
+  stroke: steelblue;
+}
+
+.selected {
+    fill: #ffba66  !important;
+}
+
+.doubleselected {
+    fill: #ff8c00 !important;
+}
+
+.highlight {
+  fill: black !important;
+
+
+
+}

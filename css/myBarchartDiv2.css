@@ -1,0 +1,26 @@
+
+/*==============================================
+ *
+ * CSS Stylesheet for barchart with ID = "myBarchartDiv2" 
+ *
+ * 04/09/2018	mjc	Created
+ *===============================================*/
+
+#myBarchartDiv2 .barchart .enterSelection  { 
+	fill: lightgreen;
+	stroke: gray;
+	stroke-width: 1;
+	opacity: 0.5;
+}
+#myBarchartDiv2 .bars.updateSelection {
+	fill: green;
+	stroke: gray;
+	stroke-width: 1;
+	opacity: 0.5;
+}	
+#myBarchartDiv2 .barchart .bars.highlight {
+	fill: limegreen;
+	stroke: black;
+	stroke-width: 2;
+	opacity: 1.0;
+}		

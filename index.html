@@ -1,0 +1,575 @@
+<!--------------------------------------------------------------------
+
+   Module: REF 2014
+
+   Author: Dominic Calina
+
+	 Adapted from Mike Chandler
+
+	 Comments throughout are by both Mike Chandler and myself
+
+   What it does:
+ 	 Dashboard for a DoR. Seperate JavaScript file for each layout
+	 Modular
+
+   Version history
+  	v001	19/11/2018	dc	Created.
+
+---------------------------------------------------------------------->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>ref14 data</title>
+	<link rel="stylesheet" type="text/css" href="css/general.css"/>
+	<link rel="stylesheet" type="text/css" href="css/pack-v001.css"/>
+	<link rel="stylesheet" type="text/css" href="css/bubbleChart-v001.css"/>
+	<link rel="stylesheet" type="text/css" href="css/map-v001.css"/>
+	<link rel="stylesheet" type="text/css" href="css/pie-v001.css"/>
+
+	<script type="text/javascript" src="d3/d3.v4.js"></script>
+	<script src="lib/model/ref14model_v002.js"></script>
+	<script src="lib/views/bubbleChart.js"></script>
+	<script src="lib/views/sortZeroStar.js"></script>
+	<script src="lib/views/map.js"></script>
+	<script src="lib/views/pack.js"></script>
+	<script src="lib/views/uniSelect.js"></script>
+	<script src="lib/views/piechart.js"></script>
+	<script src="lib/topojson/topojson.v1.min.js"></script>
+</head>
+
+<body>
+	<h2>REF14 Data</h2>
+
+
+
+	<div class="mainPanel">
+		<div class="main">
+			<div class="layout_title">
+				<div id="packTitle"></div>
+				<div id="treeDiv"></div>
+			</div>
+			<div class="layout_title">
+				<div id="pieTitle"></div>
+				<div id="p1"></div>
+			</div>
+		</div>
+		<div class="main">
+			<div id="treeDiv"></div>
+			<div id="p1"></div>
+		</div>
+
+
+		<div class="main">
+			<div id="BubbleTitle"></div>
+			<div id="ZeroStarTitle"></div>
+		</div>
+
+		<div class="main">
+			<div ID=barchart1Div>	</div>
+			<div ID=barchart2Div></div>
+		</div>
+	</div>
+
+	<div class="mapPanel">
+
+		<div class = "main">
+			<div class = "map">
+				<div id="mapTitle"></div>
+				<div id="mapdiv"></div>
+			</div>
+			<div class ="map">
+				<div id="uniSelect"></div>
+				<div id="maplistdiv"></div>
+			</div>
+		</div>
+	</div>
+
+
+<script type="text/javascript">
+"use strict"
+
+//object variables
+var dm1 = modelConstructor(); //Create datamodel object (gives access to methods in ref14model.js etc )
+var dataModel; //shorthand for dm1.model() and declared as nasty outer block variable for easy access from console.
+var bc1; //bubbleChart 1
+var bc2; //filtered 0% layout
+
+var maplist; //uni select
+var tr1; //The hierarchical pack
+var	map1 = map("#mapdiv");
+var pie1 = piechart("#p1");
+var countries, towns;
+
+//global variable for uni select to know if it needs to filter by
+//subjects
+var mapFilter = "";
+var mapType = "all";
+
+
+
+//=============== READ DATA FILES ================================
+
+//load data
+d3.queue()
+	.defer(d3.csv, "data/topics/REF2014T30TopicOrder.csv")
+	.defer(d3.csv, "data/290183_REF_Contextual_table_1314_0.csv")
+	.defer(d3.csv, "data/learning-providers-plus.csv")
+	.defer(d3.json, "data/topics/REF2014T30Python.json")
+	.defer(d3.json, "maps/uk.json")
+	.await(initialiseApp)
+
+//======================== MAIN FUNCTION =================================
+//Carries out all initialization and setup
+function initialiseApp(error, ref14data, ref14context , learningProviders, jsonTopicData, uk){
+	//Check data files have loaded
+	if (error) {console . log (" there are errror with loading the data: ", error); return;}
+
+	//Create data model
+	dm1.loadData(ref14data, ref14context , learningProviders, jsonTopicData);
+	dataModel = dm1.model()
+
+
+
+	countries = topojson.feature(uk, uk.objects.subunits).features;
+
+	//render map
+	map1
+		.loadAndRenderMap(countries)
+		.overrideTownLongLatAccessor(longLatAccessor)
+		.overrideTownNameAccessor(d=>firstCaps(d.key));
+
+
+
+	//Group REF entries by town
+	var townGroups = d3.nest()
+		.key(e=>e.lp.TOWN)
+		.entries(dataModel.refEntries);
+
+	//add click function and render towns in map
+	map1
+		.appendClickFunction(MapClickFunction)
+		.loadAndRenderTowns(townGroups);
+
+	//map title
+	var mapTitleDiv = document.getElementById("mapTitle");
+	mapTitleDiv.innerHTML = "All Universities";
+
+	//sum of total staff for each department. Starting pack
+	var nest = d3.nest()
+		.key(e=>e["Main panel"])
+		.key(d=>d.UoAString)
+		.rollup(function(e) { return d3.sum(e, e=>e.context.scaledFTE ); })
+		.entries(dataModel.refEntries);
+
+	//key is university name
+	//sort by key, A-Z
+	var universities = d3.nest()
+		.key(function(d) { return d["Institution name"]; })
+		.sortKeys(d3.ascending)
+		.entries(dataModel.refEntries);
+	universities = universities.map(e => e.key)
+
+	//render pack
+	tr1 = pack("#treeDiv")
+		.appendClick1Function(PackClickFunction)
+		.appendDoubleClick1Function(PackDoubleClickFunction)
+		.loadAndRenderNestDataset(nest, "REF2014")
+		var packTitleDiv = document.getElementById("packTitle");
+		packTitleDiv.innerHTML = "Total staff: All universities";
+
+	//set up uni select
+	maplist = circlelist("#maplistdiv")
+		.appendMLClickFunction(MapListClickFunction)
+		.overrideListKeyFunction(e => e["Institution name"]);
+
+
+	//set up bubble start and override functions
+	bc1 = bubbleChart("#barchart1Div")
+	  .appendClick2Function(BubbleClickFunction)
+		.appendDoubleClick2Function(BubbleDoubleClickFunction)
+		.overrideDataFieldFunction(e => Number(e.environment["4*"])) //Use the 4* assessment as X coordinate
+		.overrideDataField1Function(e => Number(e.environment["WordCount"])) //Use the Word Count as Y coordinate
+    .overrideDataField2Function(e => Number(e.context["scaledFTE"]))
+    .overrideDataField3Function(e=>e["Main panel"])
+		.overrideDataField4Function(e=> e.UoAString)
+		.overrideDataField5Function(e=> e["Institution name"])
+		.overrideKeyFunction(e => e["UoAString with Multiple submission letter appended"])
+		.overrideTooltipFunction(e => {return e["Institution name"]+ "\n" +
+		"Department: " + e.UoAString + "\n" + "Percentage of 4* ratings = " +
+		e.environment["4*"] + "%" + "\n" +
+		"Word Count: " + e.environment["WordCount"] + "\n" +
+		"Number of Staff: " + e.context["scaledFTE"]
+		;})
+		.maxValueOfDataField(100);
+
+		//set up 0% 4* filter div
+		bc2 = zeroFilter("#barchart2Div")
+			.appendClick3Function(BubbleClickFunction)
+			.overrideDFunction(e => Number(e.environment["4*"])) //Use the 4* assessment as X coordinate
+			.overrideD1Function(e => Number(e.environment["WordCount"])) //Use the Word Count as Y coordinate
+	    .overrideD2Function(e => Number(e.context["scaledFTE"]))
+	    .overrideD3Function(e=>e["Main panel"])
+			.overrideD4Function(e=> e.UoAString)
+			.overrideD5Function(e=> e["Institution name"])
+			.overrideKFunction(e => e.DocumentID)
+			.overrideTtipFunction(e => {return e["Institution name"]+ "\n" +
+	    "Department: " + e.UoAString + "\n" + "Percentage of 4* ratings = " +
+	    e.environment["4*"] + "%" + "\n" +
+	    "Word Count: " + e.environment["WordCount"] + "\n" +
+	    "Number of Staff: " + e.context["scaledFTE"]
+	    ;})
+			.maxValueOfDField(100);
+}
+
+
+//==================== HELPER FUNCTIONS =========================================
+
+	function firstCaps(name) {
+		return name[0] + name.slice(1).toLowerCase()
+	};
+
+	function longLatAccessor(d) {
+	//Will assume (eek!) that first REF entry in a town group
+	//contains valid lat and long
+		var latitude = d.values[0].lp.LATITUDE;
+		var longitude = d.values[0].lp.LONGITUDE;
+		return [longitude, latitude]
+	}
+	function renderUniversityData(university, subject){
+
+	//Generate set of REF entries for this university
+
+	if (subject == null) {
+		var bc1Data = dataModel.refEntries
+			.filter(e => e["Institution name"] == university)
+			.sort(function(a,b){return a["UoAString with Multiple submission letter appended"] > b["UoAString with Multiple submission letter appended"]})
+		//Render the bubbleChart
+		bc1.loadAndRenderDataset(bc1Data);
+	}
+	if (university == null){
+		var bc1Data = dataModel.refEntries
+			.filter(e => e.UoAString == subject)
+			.sort(function(a,b){return a["UoAString with Multiple submission letter appended"] > b["UoAString with Multiple submission letter appended"]})
+		//Render the bubbleChart
+		bc1.loadAndRenderDataset(bc1Data);
+	}
+}
+
+function renderUniversityData1(university, subject){
+
+//Generate set of REF entries for this university
+if (subject == null) {
+	var bc2Data = dataModel.refEntries
+		.filter(e => e["Institution name"] == university)
+		.filter(d=>d.environment["4*"] == "0")
+		.sort(function(a,b){return a["UoAString with Multiple submission letter appended"] > b["UoAString with Multiple submission letter appended"]});
+
+//Render the filter layout
+bc2.loadAndRenderD(bc2Data);
+}
+if (university == null) {
+	var bc2Data = dataModel.refEntries
+		.filter(e => e.UoAString == subject)
+		.sort(function(a,b){return a["UoAString with Multiple submission letter appended"] > b["UoAString with Multiple submission letter appended"]})
+//Render the bubbleChart
+bc2.loadAndRenderD(bc2Data);
+}
+if(bc2Data.length == "0") {
+	var ZeroStarTitleDiv = document.getElementById("ZeroStarTitle");
+	ZeroStarTitleDiv.innerHTML = "";
+
+}
+else {
+	var ZeroStarTitleDiv = document.getElementById("ZeroStarTitle");
+	ZeroStarTitleDiv.innerHTML = "Entries with 0% 4* Rating";
+}
+
+}
+
+function MapListClickFunction(d) {
+
+	var uni = d["Institution name"];
+	renderUniversityData(uni, null);
+	renderUniversityData1(uni, null);
+
+	var UniSelect = dataModel.refEntries.filter(d=>d["Institution name"] == uni) ;
+
+	var nest = d3.nest()
+		.key(e=>e["Main panel"])
+		.key(d=>d.UoAString)
+		.rollup(function(e) { return d3.sum(e, e=>e.context.scaledFTE ); })
+		.entries(UniSelect);
+
+	tr1
+		.appendClick1Function(PackClickFunction)
+		.appendDoubleClick1Function(PackDoubleClickFunction)
+		.loadAndRenderNestDataset(nest, "REF2014")
+	var packTitleDiv = document.getElementById("packTitle");
+	packTitleDiv.innerHTML = "Departments at " + d["Institution name"];
+	var BubbleTitleDiv = document.getElementById("BubbleTitle");
+	BubbleTitleDiv.innerHTML = d["Institution name"];
+}
+
+function mouseOverHighlight (d, i) {
+
+	var key_spaceremoved = (d.UoAString.replace(/ /g,'_')).replace(/,/g,"_");
+
+	console.log("key--" + key_spaceremoved)
+	d3.selectAll(".key--" + key_spaceremoved)
+		.classed("highlight", true)
+
+}
+
+function mouseOutHighlight (d,i) {
+	var key_spaceremoved = (d.UoAString.replace(/ /g,'_')).replace(/,/g,"_");
+	d3.selectAll(".key--" + key_spaceremoved)
+		.classed("highlight", false)
+}
+
+function MapClickFunction(d){
+	//If leaf node then user has clicked on a University
+	//so render that university's data in a bubbleChart
+		console.log("click", d["Institution name"]);
+
+		var region = d.values[0].lp.TOWN;
+		console.log(mapFilter);
+
+		//need to include main panel
+		if(mapType == "all") {
+			var mapListData = dataModel.refEntries
+				.filter(e =>e.lp.TOWN == region);
+		}
+		else if(mapType == "panel") {
+			var mapListData = dataModel.refEntries
+				.filter(e =>e.lp.TOWN == region)
+				.filter(e =>e["Main panel"] == mapFilter);
+
+		}
+		else {
+			var mapListData = dataModel.refEntries
+				.filter(e =>e.lp.TOWN == region)
+				.filter(e =>e.UoAString == mapFilter);
+		}
+
+		var mapListDiv = document.getElementById("uniSelect");
+		mapListDiv.innerHTML = "Uni Select";
+
+		maplist.loadAndRenderUniList(mapListData);
+
+		var topicData = dataModel.refEntries
+				.filter(e => e["Institution name"] == "n/a")
+				.filter(e=> e.UoAString == "n/a");
+
+		renderPie(topicData);
+
+		var nest = d3.nest()
+ 	 	.key(e=>e["Main panel"])
+ 	 	.key(d=>d.UoAString)
+ 	 	.rollup(function(e) { return d3.sum(e, e=>e.context.scaledFTE ); })
+ 	 	.entries(dataModel.refEntries);
+
+
+ 		tr1
+ 			.loadAndRenderNestDataset(nest, "REF2014")
+		var packTitleDiv = document.getElementById("packTitle");
+		packTitleDiv.innerHTML = "Total staff: All universities";
+		var pieTitleDiv = document.getElementById("pieTitle");
+		pieTitleDiv.innerHTML = "";
+
+
+}
+
+function BubbleDoubleClickFunction(d) {
+	mapType = "subject";
+	var subject = d.UoAString;
+	var SubjectSelect = dataModel.refEntries.filter(d=>d.UoAString == subject) ;
+	var mapTitleDiv = document.getElementById("mapTitle");
+	mapTitleDiv.innerHTML = "All Universities with "
+	+ d.UoAString;
+
+
+
+	var townGroups = d3.nest()
+		.key(e=>e.lp.TOWN)
+		.entries(SubjectSelect);
+
+	map1
+		.appendClickFunction(MapClickFunction)
+		.loadAndRenderTowns(townGroups);
+
+		var mapListData = dataModel.refEntries
+			.filter(e =>e.lp.TOWN == "n/a");
+		maplist.loadAndRenderUniList(mapListData);
+
+		var mapListDiv = document.getElementById("uniSelect");
+		mapListDiv.innerHTML = "";
+
+
+
+}
+
+function BubbleClickFunction(d){
+	//If leaf node then user has clicked on a University
+	//so render that university's data in a bubbleChart
+		console.log("Bubblecheck")
+		console.log(d["Institution name"]);
+		var uni = d["Institution name"];
+		var UniSelect = dataModel.refEntries.filter(d=>d["Institution name"] == uni) ;
+		console.log(UniSelect);
+
+		var nest = d3.nest()
+			.key(e=>e["Main panel"])
+			.key(d=>d.UoAString)
+			.rollup(function(e) { return d3.sum(e, e=>e.context.scaledFTE ); })
+			.entries(UniSelect);
+
+		tr1
+			.appendClick1Function(PackClickFunction)
+			.appendDoubleClick1Function(PackDoubleClickFunction)
+			.loadAndRenderNestDataset(nest, "REF2014")
+		var packTitleDiv = document.getElementById("packTitle");
+		packTitleDiv.innerHTML = "Departments at " + d["Institution name"];
+
+		var uni = d["Institution name"];
+		var subject = d.UoAString;
+
+		var topicData = dataModel.refEntries
+				.filter(e => e["Institution name"] == uni)
+				.filter(e=> e.UoAString == subject);
+
+		renderPie(topicData);
+		var pieTitleDiv = document.getElementById("pieTitle");
+		pieTitleDiv.innerHTML = "Topic Weight" + "<br />" + uni
+		 + "<br />" + subject;
+
+		 mapFilter = d.UoAString;
+
+		 var mapListData = dataModel.refEntries
+			 .filter(e =>e.lp.TOWN == "n/a");
+		 maplist.loadAndRenderUniList(mapListData);
+
+		var mapListDiv = document.getElementById("uniSelect");
+ 		mapListDiv.innerHTML = "";
+
+
+
+}
+function PackClickFunction(d){
+
+
+	//If leaf node then user has clicked on a University
+	//so render that university's data in a bubbleChart
+
+		console.log("click", d.data["key"]);
+
+
+		if (d.height == 0)
+			{
+				mapType = "subject";
+				var subject = d.data["key"]
+				var SubjectSelect = dataModel.refEntries.filter(d=>d.UoAString == subject) ;
+				var mapTitleDiv = document.getElementById("mapTitle");
+				mapTitleDiv.innerHTML = "All Universities with "
+				+ d.data["key"];
+			}
+		if (d.height == 1)
+			{
+				mapType = "panel";
+				var subject = d.data["key"]
+				var SubjectSelect = dataModel.refEntries.filter(d=>d["Main panel"] == subject) ;
+				var mapTitleDiv = document.getElementById("mapTitle");
+				mapTitleDiv.innerHTML = "All Universities with Main Panel "
+				+ d.data["key"];
+			}
+		if (d.height == 2)
+			{
+				mapType = "all";
+				var SubjectSelect = dataModel.refEntries;
+				var mapTitleDiv = document.getElementById("mapTitle");
+				mapTitleDiv.innerHTML = "All Universities";
+			}
+
+		//Group REF entries by town
+		var townGroups = d3.nest()
+			.key(e=>e.lp.TOWN)
+			.entries(SubjectSelect);
+
+		map1
+			.appendClickFunction(MapClickFunction)
+			.loadAndRenderTowns(townGroups);
+
+			var topicData = dataModel.refEntries
+					.filter(e => e["Institution name"] == "n/a")
+					.filter(e=> e.UoAString == "n/a");
+
+			renderPie(topicData);
+			var pieTitleDiv = document.getElementById("pieTitle");
+			pieTitleDiv.innerHTML = "";
+
+			mapFilter = d.data["key"];
+
+			var mapListData = dataModel.refEntries
+				.filter(e =>e.lp.TOWN == "n/a");
+			maplist.loadAndRenderUniList(mapListData);
+
+			var mapListDiv = document.getElementById("uniSelect");
+	 		mapListDiv.innerHTML = "";
+
+}
+
+function PackDoubleClickFunction(d){
+	//If leaf node then user has clicked on a University
+	//so render that university's data in a bubbleChart
+
+		console.log("click", d.data["key"]);
+
+
+		if (d.height == 0)
+			{
+				renderUniversityData(null, d.data["key"])
+				renderUniversityData1(null, d.data["key"])
+				var BubbleTitleDiv = document.getElementById("BubbleTitle");
+				BubbleTitleDiv.innerHTML = d.data["key"];
+			}
+		if (d.height == 2)
+			{
+				var packTitleDiv = document.getElementById("packTitle");
+				packTitleDiv.innerHTML = "Total staff: All universities";
+				var nest = d3.nest()
+					.key(e=>e["Main panel"])
+					.key(d=>d.UoAString)
+					.rollup(function(e) { return d3.sum(e, e=>e.context.scaledFTE ); })
+					.entries(dataModel.refEntries);
+
+				tr1
+					.appendClick1Function(PackClickFunction)
+					.appendDoubleClick1Function(PackDoubleClickFunction)
+					.loadAndRenderNestDataset(nest, "REF2014")
+			}
+			var topicData = dataModel.refEntries
+					.filter(e => e["Institution name"] == "n/a")
+					.filter(e=> e.UoAString == "n/a");
+
+			renderPie(topicData);
+			var pieTitleDiv = document.getElementById("pieTitle");
+			pieTitleDiv.innerHTML = "";
+
+			var mapListData = dataModel.refEntries
+				.filter(e =>e.lp.TOWN == "n/a");
+			maplist.loadAndRenderUniList(mapListData);
+
+			var mapListDiv = document.getElementById("uniSelect");
+	 		mapListDiv.innerHTML = "";
+
+}
+
+function renderPie(dataset){
+		console.log("Test point 1")
+		pie1.loadAndRenderPie(dataset)
+	}
+
+</script>
+</body>
+</html>
